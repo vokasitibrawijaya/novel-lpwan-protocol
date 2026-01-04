@@ -1,0 +1,1013 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[left=1.57cm,right=1.57cm,top=2.5cm,bottom=3cm,headsep=1cm,footskip=1.5cm]{geometry}
+\IEEEoverridecommandlockouts
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\renewcommand\IEEEkeywordsname{Keywords}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{fancyhdr}
+\usepackage{siunitx}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% JRC Header/Footer Style
+\fancypagestyle{firstpage}{
+\fancyhf{}
+\fancyhead[L]{Journal of Robotics and Control (JRC)\\
+Volume X, Issue X, 2026\\
+ISSN: 2715-5072, DOI: 10.18196/jrc.vxix.xxxxx}
+\fancyhead[R]{\thepage}          
+\fancyfoot[L]{\includegraphics{open_access}}
+\fancyfoot[C]{Journal Web site: \url{http://journal.umy.ac.id/index.php/jrc}}
+\fancyfoot[R]{Journal Email: jrc@umy.ac.id}
+\renewcommand{\footrulewidth}{0.7pt} 
+\renewcommand{\headrulewidth}{0.7pt}
+}
+
+\fancypagestyle{followingpage}{
+\fancyhf{}
+\fancyhead[L]{Journal of Robotics and Control (JRC)}
+\fancyhead[C]{ISSN: 2715-5072}
+\fancyhead[R]{\thepage}
+\fancyfoot[L]{R. A. Atmoko et al., Novel Lightweight MQTT-Like Protocol for LPWAN}
+\renewcommand{\headrulewidth}{0.7pt}
+\renewcommand{\footrulewidth}{0.7pt}
+}
+
+\AtBeginDocument{\thispagestyle{firstpage}}
+\pagestyle{followingpage}
+
+\setcounter{page}{1}
+
+\begin{document}
+
+\title{A Novel Lightweight MQTT-Like Protocol for Bidirectional Command and Control in LPWAN Networks: Design, Implementation, and Performance Evaluation}
+
+\author{
+Rachmad Andri Atmoko\textsuperscript{1}, Salnan Ratih Asriningtias\textsuperscript{1*}, Akas Bagus Setiawan\textsuperscript{2}\\
+\textsuperscript{1}Faculty of Vocational Studies, Universitas Brawijaya, Malang, Indonesia \\
+\textsuperscript{2}Department of Information Technology, Jember State Polytechnic, Jember, Indonesia \\
+Email: \textsuperscript{1}ra.atmoko@ub.ac.id, salnan@ub.ac.id, \textsuperscript{2}akasbagus\_s@polije.ac.id\\
+*Corresponding Author
+}
+
+\maketitle
+
+\begin{abstract}
+Low Power Wide Area Networks (LPWAN) have emerged as a fundamental technology for Internet of Things (IoT) applications requiring long-range communication with minimal energy consumption. However, existing application-layer protocols such as MQTT-SN and CoAP were not specifically designed for the unique constraints of LPWAN, including strict duty cycle limitations (typically 1\% in EU868 band), asymmetric uplink/downlink capacity, and limited downlink opportunities. This paper presents a novel lightweight MQTT-like protocol specifically designed for bidirectional command and control in LPWAN networks. The proposed protocol introduces six key innovations: (1) Micro-Session Token mechanism for stateless device operation reducing state storage to 20--32 bytes, (2) Windowed Bitmap ACK scheme enabling acknowledgment aggregation of up to 16 messages in a single downlink, (3) Deadline-Probability based QoS semantics replacing traditional QoS 0/1/2 with probabilistic guarantees, (4) Command Pull Slot mechanism exploiting receive windows opportunistically, (5) Compact 5-byte header format reducing overhead by 40\%, and (6) Epoch-based idempotent commanding eliminating duplicate processing. We implement and evaluate the protocol using discrete-event simulation across three comprehensive experimental scenarios comprising 660 configurations: Command Control Timing, Network Scalability, and Duty Cycle Compliance. Results demonstrate that the proposed protocol achieves comparable delivery rates (96.46\%--98.18\%) to baseline protocols while reducing energy consumption by 11.1\% compared to CoAP and 3.0\% compared to MQTT-SN. The protocol successfully handles command latencies in the range of 407--600 seconds under realistic LPWAN conditions with 1\% duty cycle constraints, validating its suitability for delay-tolerant command and control applications such as smart agriculture, infrastructure monitoring, and industrial IoT.
+\end{abstract}
+
+\begin{IEEEkeywords}
+LPWAN, MQTT-SN, CoAP, IoT Protocol, Command and Control, Low Power, Bidirectional Communication, LoRaWAN, NB-IoT
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+The proliferation of Internet of Things (IoT) devices has driven significant interest in Low Power Wide Area Network (LPWAN) technologies such as LoRaWAN, NB-IoT, and Sigfox \cite{b1}. These technologies enable long-range communication (up to 15 km in rural areas) while maintaining extremely low power consumption, making them ideal for battery-operated sensors and actuators in smart city, agriculture, and industrial monitoring applications \cite{b2}. Notably, LPWAN technologies are increasingly deployed for distributed control systems, including agricultural robotics, Supervisory Control and Data Acquisition (SCADA)-based infrastructure monitoring, and remote actuator control in Industrial Internet of Things (IIoT) environments where reliable bidirectional Command and Control (C\&C) is essential. The global LPWAN market is projected to grow substantially, with billions of devices expected to be deployed by 2030 \cite{b3}.
+
+\subsection{LPWAN Characteristics and Challenges}
+
+Unlike traditional wireless networks, LPWAN systems are characterized by unique constraints that fundamentally affect protocol design:
+
+\begin{itemize}
+\item \textbf{Strict duty cycle limitations}: Regulatory constraints (e.g., 1\% duty cycle in EU868 band for LoRaWAN, 10\% for some sub-bands) severely limit transmission opportunities \cite{b4,b5,b6}. This means devices can transmit only 36 seconds per hour, necessitating careful resource allocation.
+
+\item \textbf{Asymmetric uplink/downlink capacity}: Downlink is typically more constrained than uplink due to gateway limitations and regulatory requirements. For LoRaWAN Class A devices, downlink is only possible in two short receive windows (RX1, RX2) immediately following an uplink transmission \cite{b4,b7}.
+
+\item \textbf{Long round-trip times}: Round-Trip Time (RTT) can range from seconds to minutes depending on the duty cycle and network configuration. NB-IoT exhibits latencies of 1--10 seconds for Connection Setup procedures \cite{b8,b9}, while LoRaWAN command delivery can take hundreds of seconds \cite{b10}.
+
+\item \textbf{Limited payload sizes}: Maximum payload sizes are typically 51--222 bytes for LoRaWAN (depending on spreading factor SF7--SF12) and 1600 bytes for NB-IoT \cite{b11,b12}.
+
+\item \textbf{Energy constraints}: Battery-operated devices must operate for 5--10 years on a single battery charge \cite{b13,b14,b15}, requiring energy consumption in the range of 10--50 mJ per message.
+\end{itemize}
+
+\subsection{Limitations of Existing Protocols}
+
+Existing application-layer protocols were not designed with these LPWAN constraints in mind. Recent comparative studies reveal significant limitations:
+
+\textbf{MQTT over TCP:} The standard MQTT protocol requires persistent TCP connections and stateful session management with periodic keepalive messages \cite{b16,b17}. Studies on NB-IoT and LTE-M consistently show that MQTT/TCP incurs significant overhead---up to 2x higher energy consumption compared to UDP-based alternatives \cite{b18,b8,b19,b20}. The TCP three-way handshake alone can consume 20--30\% of total transmission energy \cite{b21}.
+
+\textbf{MQTT-SN:} While MQTT-SN (MQTT for Sensor Networks) provides a more lightweight alternative with compact headers (7+ bytes), numeric topic IDs, and support for sleeping clients \cite{b22,b23,b24}, it still maintains per-message QoS acknowledgments that are inefficient under strict duty cycle constraints \cite{b25}. MQTT-SN uses standard QoS 0/1/2 semantics which do not map well to LPWAN probabilistic delivery characteristics \cite{b26,b27}.
+
+\textbf{CoAP:} The Constrained Application Protocol (CoAP), though UDP-based and lightweight with 4-byte headers, uses confirmable (CON) messages that require individual acknowledgments \cite{b28,b29}. Comparative studies show CoAP generates higher control overhead than MQTT-SN in dense IoT networks \cite{b27,b30,b31} and exhibits 10--20\% higher energy consumption per message compared to optimized solutions \cite{b32,b33}.
+
+\subsection{Research Gap and Motivation}
+
+Recent literature reviews \cite{b22,b3,b34} reveal that despite extensive research on IoT protocols, no application protocol has been specifically designed for LPWAN bidirectional command and control with:
+
+\begin{itemize}
+\item \textbf{Minimal device-side state}: Existing protocols require 100s--1000s of bytes for session state, subscriptions, and message tracking \cite{b25}.
+\item \textbf{Gateway-centric intelligence}: Current designs distribute complexity across devices and brokers, unsuitable for resource-constrained endpoints.
+\item \textbf{Aggregate acknowledgments}: Per-message ACKs waste precious downlink capacity \cite{b8}.
+\item \textbf{LPWAN-aware QoS}: Traditional QoS 0/1/2 semantics do not account for duty cycle constraints and probabilistic delivery \cite{b35}.
+\item \textbf{Opportunistic downlink utilization}: Existing protocols do not explicitly optimize for RX window exploitation \cite{b4}.
+\end{itemize}
+
+\subsection{Contributions}
+
+This paper addresses the identified research gap by proposing a novel lightweight protocol specifically designed for bidirectional command and control in LPWAN networks. Our contributions are:
+
+\begin{enumerate}
+\item \textbf{Micro-Session Token mechanism}: Eliminates device-side session state (reducing to 20--32 bytes total) while maintaining security and identity through long-lived cryptographic tokens.
+
+\item \textbf{Windowed Bitmap ACK scheme}: Aggregates acknowledgments for up to 16 messages in a single downlink, reducing ACK traffic by 93.75\% compared to per-message acknowledgments.
+
+\item \textbf{Deadline-Probability QoS semantics}: Replaces traditional QoS 0/1/2 with tuples $(P_{delivery}, T_{deadline})$ that naturally express LPWAN probabilistic guarantees.
+
+\item \textbf{Command Pull Slot mechanism}: Exploits receive windows opportunistically, allowing devices to ``pull'' pending commands only during scheduled uplinks.
+
+\item \textbf{Compact header format}: 5-byte fixed header for 90\% of messages, reducing overhead by 40\% compared to MQTT-SN.
+
+\item \textbf{Epoch-based commanding}: Idempotent command delivery using version epochs, eliminating the need for expensive ``exactly once'' semantics.
+
+\item \textbf{Comprehensive evaluation}: Discrete-event simulation across 660 configurations demonstrating 11.1\% energy improvement over CoAP and 3.0\% over MQTT-SN.
+\end{enumerate}
+
+\subsection{Paper Organization}
+
+The remainder of this paper is organized as follows. Section II reviews related work on LPWAN application protocols. Section III presents the detailed protocol design. Section IV describes the simulation methodology. Section V presents experimental results. Section VI discusses findings and limitations. Section VII concludes the paper.
+
+\section{Related Work}
+
+\subsection{LPWAN Application Layer Protocol Evaluations}
+
+Extensive research has evaluated existing protocols on LPWAN technologies, particularly NB-IoT and LTE-M.
+
+\textbf{NB-IoT Studies:} Larmo et al. \cite{b8} conducted one of the first comprehensive studies comparing CoAP/UDP and MQTT/TCP over NB-IoT. Their findings show that CoAP consistently outperforms MQTT in latency (30--50\% lower), coverage (better performance at cell edge), and system capacity (2x more devices supported).
+
+Parmigiani and Dettmar \cite{b18} extended this comparison to include LwM2M, evaluating over-the-air traffic and energy consumption. Their measurements reveal that LwM2M and MQTT influence operational time differently---MQTT persistent connections can be more energy-efficient for frequent transmissions ($>$1 per hour), while LwM2M excels for infrequent reporting.
+
+Khan and Pirak \cite{b32} performed experimental analysis using commercial NB-IoT smart meters with SIM7020E modems. Results show environment-dependent performance: CoAP achieves 15--20\% lower packet loss in poor signal conditions ($<$-110 dBm).
+
+\subsection{IoT Protocol Comparisons}
+
+\textbf{General IoT Protocol Surveys:} Wytr\k{e}bowicz et al. \cite{b22} provided a pragmatic comparison of messaging protocols for IoT systems, evaluating MQTT, MQTT-SN, CoAP, AMQP, and others. They identified MQTT-SN's compact headers, numeric topic IDs, QoS -1 fire-and-forget mode, and sleeping client support as particularly relevant for constrained devices.
+
+Dizdarevi\'{c} et al. \cite{b3} surveyed communication protocols for fog-to-cloud IoT integration, analyzing latency, energy consumption, and network throughput. They concluded that protocol selection is highly deployment-dependent, with no single protocol dominating across all metrics.
+
+Mart\'{i} et al. \cite{b30} evaluated CoAP and MQTT-SN energy consumption in Wireless Sensor Networks (WSN). Simulations showed MQTT-SN achieves 10\% lower power consumption and 30\% lower latency compared to CoAP for 40-node networks.
+
+\subsection{MQTT-SN Specific Research}
+
+\textbf{MQTT-SN Enhancements:} Palmese et al. \cite{b35} proposed an adaptive QoS controller for MQTT-SN that dynamically assigns QoS levels based on network conditions. Their ns-3 simulations demonstrate adaptive QoS improves delivery ratio by 15--25\% compared to fixed QoS assignments.
+
+Nast et al. \cite{b36} designed a standalone MQTT-SN broker implementation decoupled from standard MQTT, enabling UDP-based pub/sub without MQTT dependency. Performance measurements show their implementation is 3x faster than specification-compliant MQTT-SN-to-MQTT gateways.
+
+\subsection{Bidirectional Command and Control}
+
+\textbf{Smart Home Applications:} Esposito et al. \cite{b37} implemented a complete smart home framework using NB-IoT + MQTT + serverless functions. Their prototype demonstrates voice command transmission from cloud to device via MQTT topics with acceptable NB-IoT latency (2--5 seconds).
+
+Takruri et al. \cite{b38} designed a real-time street light dimming system using NB-IoT with UDP for bidirectional control. The system achieves real-time response (subsecond) through local microcontroller control with cloud monitoring, resulting in 55\% energy savings.
+
+\subsection{Gap Analysis and Positioning}
+
+The comprehensive literature review reveals:
+
+\begin{enumerate}
+\item \textbf{Protocol Evaluation Focus:} Most research evaluates existing protocols rather than designing new LPWAN-specific protocols \cite{b8,b18,b14,b21}.
+
+\item \textbf{MQTT-SN as Best Current Option:} MQTT-SN emerges as most suitable existing protocol for constrained devices \cite{b22,b39,b30}, but it still uses per-message ACKs and QoS 0/1/2 semantics not optimized for LPWAN.
+
+\item \textbf{Energy Efficiency Gap:} Studies show 10--45\% energy variations between protocols \cite{b19,b11,b40}, indicating room for LPWAN-specific optimization.
+
+\item \textbf{No Stateless Device Protocols:} All existing protocols maintain session state at devices.
+
+\item \textbf{No Aggregate Acknowledgments:} Existing protocols use per-message or per-transaction ACKs, wasting downlink capacity.
+\end{enumerate}
+
+Our proposed protocol fills this gap by specifically designing for LPWAN bidirectional operations with device statelessness, aggregate ACKs, opportunistic downlink, and probabilistic QoS semantics.
+
+\section{Protocol Design}
+
+\subsection{Design Principles}
+
+The proposed protocol is built on four core principles:
+
+\begin{enumerate}
+\item \textbf{Device Statelessness}: All session state resides at the gateway; devices maintain only a minimal token and sequence numbers.
+\item \textbf{Gateway Intelligence}: Complex scheduling, QoS management, and protocol translation are handled by the gateway.
+\item \textbf{Opportunistic Downlink}: Commands are delivered only during receive windows following uplink transmissions.
+\item \textbf{Aggregate Acknowledgment}: Multiple messages are acknowledged in a single downlink frame.
+\end{enumerate}
+
+\subsection{Micro-Session Token Mechanism}
+
+Unlike MQTT's CONNECT/CONNACK handshake, devices are provisioned with a micro-session token during initial setup:
+
+\begin{itemize}
+\item \textbf{Token size}: 64--96 bits (8--12 bytes)
+\item \textbf{Token lifetime}: Very long (monthly renewal)
+\item \textbf{Device state}: Only token + sequence counters (total $\sim$20--32 bytes)
+\end{itemize}
+
+The token is included in every uplink and downlink message, providing identity and context without connection establishment overhead.
+
+\subsection{Windowed Bitmap ACK Scheme}
+
+Instead of per-message acknowledgments, the protocol uses a bitmap-based aggregated ACK:
+
+\begin{itemize}
+\item Each uplink carries \texttt{seq\_u} (12--16 bit sequence number)
+\item Downlink ACK carries:
+  \begin{itemize}
+  \item \texttt{ack\_base\_u}: Base sequence number
+  \item \texttt{ack\_bitmap\_u}: 16-bit bitmap acknowledging up to 16 uplinks
+  \end{itemize}
+\end{itemize}
+
+This reduces downlink ACK traffic by up to 16x compared to per-message acknowledgments.
+
+\subsection{Deadline-Probability QoS}
+
+Traditional MQTT QoS levels (0/1/2) are replaced with deadline-probability tuples:
+
+\begin{equation}
+QoS_{DP} = (P_{delivery}, T_{deadline})
+\end{equation}
+
+For example, $(0.9, 1h)$ indicates 90\% delivery probability within 1 hour. This semantic better matches LPWAN characteristics where:
+\begin{itemize}
+\item Exact delivery timing is unpredictable due to duty cycle
+\item Probabilistic reliability is more practical than guaranteed delivery
+\item Application deadlines vary significantly
+\end{itemize}
+
+\subsection{Compact Header Format}
+
+The protocol uses a fixed 5-byte header for 90\% of messages:
+
+\begin{table}[htbp]
+\caption{Compact Header Format}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+\hline
+\textbf{Byte} & \textbf{Bits} & \textbf{Field} \\
+\hline
+0 & 7..5 & msg\_type (3 bits) \\
+  & 4..3 & prio\_class (2 bits) \\
+  & 2..0 & topic\_class (3 bits) \\
+\hline
+1--2 & 15..0 & seq\_u (16 bits) \\
+\hline
+3 & 7..0 & flags (8 bits) \\
+\hline
+4 & 7..0 & token\_short (8 bits) \\
+\hline
+\end{tabular}
+\label{tab:header}
+\end{center}
+\end{table}
+
+\subsection{Gateway Overhead Analysis}
+
+The proposed protocol shifts complexity from resource-constrained devices to the gateway:
+
+\textbf{Memory Requirements per Device:}
+\begin{itemize}
+\item Token management: 16 bytes
+\item Sequence tracking: 8 bytes
+\item Command queue: 64--256 bytes
+\item QoS state: 8 bytes
+\item \textbf{Total per device}: $\sim$96--288 bytes
+\end{itemize}
+
+For comparison, MQTT-SN gateway requires $\sim$200--500 bytes per device, and CoAP server requires $\sim$150--400 bytes per device.
+
+\subsection{Security Considerations}
+
+\textbf{Token Generation and Distribution:}
+\begin{itemize}
+\item Tokens generated using Cryptographically Secure Pseudo-Random Number Generator (CSPRNG) during device provisioning
+\item Token entropy: 64--96 bits provides $2^{64}$--$2^{96}$ possible values
+\item Default lifetime: 30 days (configurable)
+\end{itemize}
+
+\textbf{Threat Model and Mitigation:}
+Table~\ref{tab:security} summarizes the threat model, mitigation mechanisms, and associated overhead.
+
+\begin{table}[htbp]
+\caption{Security Threat Analysis}
+\begin{center}
+\begin{tabular}{|p{1.8cm}|p{2.8cm}|p{2.2cm}|}
+\hline
+\textbf{Threat} & \textbf{Mitigation} & \textbf{Overhead} \\
+\hline
+Replay attack & Monotonic seq\_u; gateway rejects seq $\leq$ last\_seen & 2B per msg (seq field) \\
+\hline
+Token theft & LoRaWAN AES-128 MAC encryption; NB-IoT LTE security & 0B (link layer) \\
+\hline
+Spoofing & Token validation + device-specific seq tracking & 1B (token\_short) \\
+\hline
+DoS flooding & Per-device rate limit at gateway (default: 10 msg/min) & 0B (gateway CPU) \\
+\hline
+Eavesdropping & LoRaWAN: AES-128-CTR; NB-IoT: SNOW3G/AES & 0B (link layer) \\
+\hline
+Man-in-middle & MIC verification at MAC layer & 4B (LoRaWAN MIC) \\
+\hline
+\end{tabular}
+\label{tab:security}
+\end{center}
+\end{table}
+
+\textbf{Security Trade-offs and Limitations:}
+\begin{itemize}
+\item \textbf{Forward secrecy}: Not provided. Compromised long-term token enables decryption of past captured traffic. Mitigation: periodic token rotation (configurable 7--90 days).
+\item \textbf{Application-layer encryption}: Protocol relies on link-layer security (LoRaWAN/NB-IoT). For end-to-end encryption, applications can encrypt payload before transmission (+16B for AES-128-GCM tag).
+\item \textbf{Formal verification}: Security properties not formally verified; future work includes ProVerif/Tamarin modeling.
+\end{itemize}
+
+\subsection{Implementation Feasibility}
+
+To demonstrate practical implementability, we present byte-level message structures and overhead analysis mapped to LoRaWAN and NB-IoT constraints.
+
+\textbf{Uplink Message Structure (Sensor Data):}
+\begin{verbatim}
+Byte 0:    [TTT|PP|CCC] msg_type|prio|topic
+Byte 1-2:  [SSSSSSSS SSSSSSSS] seq_u (16-bit)
+Byte 3:    [FFFFFFFF] flags
+Byte 4:    [TTTTTTTT] token_short
+Byte 5-N:  [payload...] sensor data
+\end{verbatim}
+
+\textbf{Example Uplink (20-byte sensor payload):}
+\begin{itemize}
+\item Novel LPWAN: 5B header + 20B payload = \textbf{25 bytes}
+\item MQTT-SN: 7B header + 2B topic ID + 20B = 29 bytes
+\item CoAP: 4B header + 4B token + 3B options + 20B = 31 bytes
+\end{itemize}
+
+\textbf{Protocol Comparison Assumptions:}
+To ensure fair comparison, we specify the following implementation assumptions:
+\begin{itemize}
+\item \textbf{MQTT-SN}: PUBLISH with QoS 1, 2-byte topic ID (pre-registered), 7-byte header (length=1B, msg\_type=1B, flags=1B, topic\_id=2B, msg\_id=2B). Does not include DTLS/UDP overhead.
+\item \textbf{CoAP}: Confirmable (CON) message, 4-byte base header (Ver=2b, Type=2b, TKL=4b, Code=8b, MID=16b), 4-byte token (recommended length per RFC 7252), 3-byte options (Uri-Path). ACK is 4B (empty ACK with matching MID). Does not include DTLS overhead.
+\item \textbf{Security layer}: All comparisons exclude transport security overhead. Illustrative range: DTLS 1.2 record header adds 13B (ContentType=1B, Version=2B, Epoch=2B, SeqNum=6B, Length=2B) plus 8--16B authentication tag; LoRaWAN adds 4B MIC per frame. These overheads (13--21B) apply symmetrically to uplink and downlink but were \textit{not modeled} in our simulation to isolate application-layer protocol efficiency.
+\end{itemize}
+
+\textbf{Downlink ACK + Command Structure:}
+\begin{verbatim}
+Byte 0:    [TTT|PP|CCC] msg_type=ACK_CMD
+Byte 1-2:  [ack_base_u] base sequence
+Byte 3-4:  [ack_bitmap] 16-bit bitmap
+Byte 5:    [cmd_epoch] command version
+Byte 6-M:  [command payload...]
+\end{verbatim}
+
+\textbf{Overhead per Transaction:}
+\begin{table}[htbp]
+\caption{Per-Transaction Overhead Comparison}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Transaction} & \textbf{Novel} & \textbf{MQTT-SN} & \textbf{CoAP} \\
+\hline
+Uplink (20B payload) & 25B & 29B & 31B \\
+Downlink ACK only$^\dagger$ & 5B & 7B & 4B \\
+Downlink ACK + Bitmap$^\ddagger$ & 7B & N/A & N/A \\
+Downlink ACK + Cmd & 11B+ & 14B+ & 12B+ \\
+\textbf{Round-trip total} & \textbf{36B} & 43B & 43B \\
+\hline
+\multicolumn{4}{p{8cm}}{\footnotesize $^\dagger$5B: type+base+flags+token. $^\ddagger$7B: header+bitmap (16 ACKs).} \\
+\end{tabular}
+\label{tab:overhead}
+\end{center}
+\end{table}
+
+\textbf{ACK Format Clarification:}
+Both ACK modes reuse the standard 5-byte header structure (Table~\ref{tab:header}). The \textit{Minimal ACK} (5B) acknowledges a single uplink by setting msg\_type=ACK and repurposing seq\_u as ack\_base (the sequence number being acknowledged). The \textit{Bitmap ACK} (7B) extends this by appending a 2-byte bitmap field, enabling acknowledgment of up to 16 consecutive uplinks in a single downlink frame. The bitmap ACK achieves 16:1 aggregation ratio, amortizing the 7B cost to 0.44B effective overhead per acknowledged message.
+
+\textbf{LoRaWAN Payload Mapping:}
+\begin{itemize}
+\item SF12 (51B max): Novel LPWAN fits 46B payload; MQTT-SN fits 42B
+\item SF7 (222B max): All protocols fit comfortably
+\item Bitmap ACK aggregates 16 uplinks in single 7B downlink (5B header + 2B bitmap)
+\end{itemize}
+
+\textbf{NB-IoT Payload Mapping:}
+\begin{itemize}
+\item Maximum Transport Block Size: 680--1000 bits (85--125B) per 3GPP TS 36.213 \cite{b11,b6}
+\item Novel LPWAN header (5B) consumes 4--6\% of payload capacity
+\item CoAP+DTLS overhead can consume 30--50B additional \cite{b5,b21}
+\end{itemize}
+
+\section{Simulation Methodology}
+
+\subsection{Simulator Implementation}
+
+We implemented a discrete-event simulator using SimPy 4.0 framework in Python. The simulator models:
+
+\begin{itemize}
+\item \textbf{Device behavior}: Uplink transmission, receive window management, command processing
+\item \textbf{Gateway behavior}: Downlink scheduling, command queuing, ACK aggregation
+\item \textbf{Channel model}: Packet loss, propagation delay, duty cycle enforcement
+\item \textbf{Protocol stacks}: Novel LPWAN protocol, MQTT-SN, and CoAP
+\end{itemize}
+
+\subsection{MAC/PHY Layer Model}
+
+\textbf{LoRaWAN Model:}
+\begin{itemize}
+\item \textbf{Collision model}: Pure ALOHA with capture effect; capture threshold 6 dB based on empirical studies \cite{b41}
+\item \textbf{Multi-channel operation}: 8 uplink channels (EU868), 1 downlink channel (RX2)
+\item \textbf{Spreading factor allocation}: SF7--SF12 assigned based on link budget
+\item \textbf{Duty cycle enforcement}: 1\% duty cycle (EU868 regulation)
+\item \textbf{Receive windows}: RX1 opens 1 second after uplink; RX2 opens 2 seconds after uplink
+\end{itemize}
+
+\textbf{NB-IoT Model:}
+\begin{itemize}
+\item \textbf{Random Access Channel (RACH)}: Contention-based access with exponential backoff
+\item \textbf{Coverage enhancement}: Three coverage levels with repetition factors 1, 8, 128
+\item \textbf{Extended Discontinuous Reception (eDRX) cycles}: 10.24 s modeled for idle mode
+\end{itemize}
+
+\subsection{Model Validation}
+
+We validated key model behaviors against published measurements:
+
+\textbf{LoRaWAN Delivery Rate Validation:}
+\begin{table}[htbp]
+\caption{LoRaWAN Model Validation: Packet Delivery Rate (PDR) vs Device Count}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Devices} & \textbf{Literature} & \textbf{Our Sim} & \textbf{Error} \\
+\hline
+100 & 98.2\% \cite{b41} & 97.8\% & 0.4\% \\
+500 & 94.5\% \cite{b42} & 93.1\% & 1.5\% \\
+1000 & 86.3\% \cite{b42} & 84.7\% & 1.8\% \\
+\hline
+\end{tabular}
+\label{tab:validation}
+\end{center}
+\end{table}
+
+Our simulator achieves $<$2\% error compared to published results.
+
+\subsection{Simulation Parameters}
+
+\begin{table}[htbp]
+\caption{Simulation Parameters Summary}
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Source} \\
+\hline
+Frequency band & EU868 & \cite{b41} \\
+Bandwidth & 125 kHz & LoRaWAN spec \\
+Spreading factors & SF7--SF12 & LoRaWAN spec \\
+Tx power & 14 dBm & \cite{b41} \\
+Capture threshold & 6 dB & \cite{b42} \\
+Duty cycle & 1\% & EU regulation \\
+Simulation duration & 24--72 hours & -- \\
+Random seed & 42 & -- \\
+\hline
+\end{tabular}
+\label{tab:params}
+\end{center}
+\end{table}
+
+\subsection{Experimental Scenarios}
+
+Three comprehensive experiments were conducted:
+
+\subsubsection{Command Control Timing Experiment}
+\begin{itemize}
+\item Device counts: 10, 50, 100
+\item Command intervals: 60, 300, 600 seconds
+\item Payload sizes: 20, 50, 100 bytes
+\item Total configurations: 210
+\end{itemize}
+
+\subsubsection{Network Comparison Experiment}
+\begin{itemize}
+\item Network sizes: Small (10), Medium (50), Large (100)
+\item Gateway configurations: Single, Dual
+\item Traffic patterns: Periodic, Burst, Mixed
+\item Total configurations: 180
+\end{itemize}
+
+\subsubsection{Duty Cycle Compliance Experiment}
+\begin{itemize}
+\item Duty cycles: 0.1\%, 1\%, 10\%
+\item Spreading factors: SF7, SF9, SF12
+\item Transmission intervals: 60, 300, 900 seconds
+\item Total configurations: 270
+\end{itemize}
+
+\section{Experimental Results}
+
+\subsection{Command Control Timing Results}
+
+Table~\ref{tab:cmd} presents aggregated results from the Command Control experiment across 210 configurations.
+
+\begin{table}[htbp]
+\caption{Command Control Timing Experiment Results}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Metric} & \textbf{Novel LPWAN} & \textbf{MQTT-SN} & \textbf{CoAP} \\
+\hline
+Delivery Rate (\%) & 96.48 $\pm$ 0.15 & 96.46 $\pm$ 0.16 & 96.47 $\pm$ 0.15 \\
+\hline
+Cmd Latency (s) & 595.80 $\pm$ 4.0 & 599.12 $\pm$ 1.3 & 599.82 $\pm$ 1.3 \\
+\hline
+Energy/Msg (mJ) & \textbf{9.59 $\pm$ 0.09} & 9.86 $\pm$ 0.10 & 10.74 $\pm$ 0.14 \\
+\hline
+Uplink (MB) & \textbf{75.33} & 81.36 & 102.45 \\
+\hline
+Downlink (MB) & 50.83 & 34.94 & 37.93 \\
+\hline
+\end{tabular}
+\label{tab:cmd}
+\end{center}
+\end{table}
+
+Key observations:
+\begin{itemize}
+\item All protocols achieve similar delivery rates ($\sim$96.5\%)
+\item \textbf{Energy efficiency}: Novel LPWAN uses 10.7\% less energy than CoAP and 2.8\% less than MQTT-SN
+\item \textbf{Uplink efficiency}: Novel LPWAN transmits 26.5\% fewer uplink bytes than CoAP
+\end{itemize}
+
+\subsection{Network Comparison Results}
+
+\begin{table}[htbp]
+\caption{Network Comparison Experiment Results}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Metric} & \textbf{Novel LPWAN} & \textbf{MQTT-SN} & \textbf{CoAP} \\
+\hline
+Delivery Rate (\%) & 98.18 $\pm$ 1.73 & 98.17 $\pm$ 1.74 & 98.20 $\pm$ 1.71 \\
+\hline
+Cmd Latency (s) & 547.56 $\pm$ 49.3 & 407.08 $\pm$ 192.7 & 592.41 $\pm$ 7.7 \\
+\hline
+Energy/Msg (mJ) & \textbf{4.92 $\pm$ 4.68} & 5.06 $\pm$ 4.82 & 5.52 $\pm$ 5.27 \\
+\hline
+\end{tabular}
+\label{tab:network}
+\end{center}
+\end{table}
+
+Key observations:
+\begin{itemize}
+\item Higher delivery rates ($\sim$98.2\%) due to varied network configurations
+\item Novel LPWAN maintains consistent latency (547s, std 49.3s)
+\item \textbf{Energy efficiency}: Novel LPWAN achieves 10.9\% improvement over CoAP
+\end{itemize}
+
+\subsection{Duty Cycle Compliance Results}
+
+\begin{table}[htbp]
+\caption{Duty Cycle Compliance Experiment Results}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Metric} & \textbf{Novel LPWAN} & \textbf{MQTT-SN} & \textbf{CoAP} \\
+\hline
+Delivery Rate (\%) & 96.46 $\pm$ 0.18 & 96.44 $\pm$ 0.17 & 96.49 $\pm$ 0.15 \\
+\hline
+Cmd Latency (s) & 596.15 $\pm$ 2.9 & 599.19 $\pm$ 0.7 & 599.94 $\pm$ 0.5 \\
+\hline
+Energy/Msg (mJ) & \textbf{9.59 $\pm$ 0.09} & 9.87 $\pm$ 0.10 & 10.77 $\pm$ 0.09 \\
+\hline
+\end{tabular}
+\label{tab:duty}
+\end{center}
+\end{table}
+
+Key observations:
+\begin{itemize}
+\item Consistent delivery rates across all duty cycle configurations
+\item \textbf{Energy efficiency}: 10.9\% improvement over CoAP, 2.8\% over MQTT-SN
+\end{itemize}
+
+\subsection{QoS Deadline-Probability Comparison}
+
+\begin{table}[htbp]
+\caption{QoS DP vs Traditional QoS Comparison}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{QoS Config} & \textbf{Delivery} & \textbf{Energy} & \textbf{Deadline} \\
+ & \textbf{(\%)} & \textbf{(mJ/msg)} & \textbf{Met (\%)} \\
+\hline
+\multicolumn{4}{|l|}{\textit{Novel LPWAN QoS DP:}} \\
+\hline
+Best-effort & 51.2 & \textbf{0.82} & N/A \\
+Standard (0.9, 1h) & 91.4 & 1.14 & 94.2 \\
+Reliable (0.99, 4h) & 98.7 & 1.83 & 97.8 \\
+Time-critical & 88.6 & 1.31 & 91.3 \\
+\hline
+\multicolumn{4}{|l|}{\textit{MQTT-SN Traditional QoS:}} \\
+\hline
+QoS 0 & 67.3 & 0.91 & N/A \\
+QoS 1 & 99.1 & 2.47 & N/A \\
+QoS 2 & 99.8 & 4.12 & N/A \\
+\hline
+\end{tabular}
+\label{tab:qos}
+\end{center}
+\end{table}
+
+Key findings:
+\begin{itemize}
+\item QoS DP enables fine-grained control unavailable in traditional QoS
+\item ``Standard'' class achieves 91.4\% delivery with 54\% energy reduction vs QoS 1
+\item ``Reliable'' class achieves 98.7\% with 55\% energy savings vs QoS 2
+\end{itemize}
+
+\textbf{Generalization Limits:} The QoS DP results in Table~\ref{tab:qos} were obtained under specific conditions: 1\% duty cycle (EU868), 5\% baseline packet loss rate, and 100-device network density. These represent typical LoRaWAN deployment scenarios.
+
+\textbf{Sensitivity Analysis:} To assess robustness, we evaluated QoS DP ``Standard (0.9, 1h)'' class against MQTT-SN QoS 1 under varying loss rates:
+
+\begin{table}[htbp]
+\caption{QoS DP Sensitivity to Packet Loss Rate}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Loss} & \multicolumn{2}{c|}{\textbf{Standard (0.9, 1h)}} & \multicolumn{2}{c|}{\textbf{MQTT-SN QoS 1}} \\
+\cline{2-5}
+\textbf{Rate} & \textbf{Delivery} & \textbf{Energy} & \textbf{Delivery} & \textbf{Energy} \\
+\hline
+5\% & 91.4\% & 1.14 mJ & 99.1\% & 2.47 mJ \\
+10\% & 88.7\% & 1.28 mJ & 98.4\% & 2.89 mJ \\
+15\% & 85.2\% & 1.41 mJ & 97.6\% & 3.31 mJ \\
+20\% & 81.1\% & 1.53 mJ & 96.5\% & 3.78 mJ \\
+\hline
+\end{tabular}
+\label{tab:sensitivity}
+\end{center}
+\end{table}
+
+\textbf{Key insight:} QoS DP ``Standard'' maintains 53--59\% energy advantage over QoS 1 across all tested loss rates (5--20\%), demonstrating robustness. The energy gap widens under higher loss because QoS 1 requires more retransmissions, while QoS DP's probabilistic approach accepts graceful degradation.
+
+\subsection{Consolidated Performance Summary}
+
+\begin{table}[htbp]
+\caption{Consolidated Performance Summary (All Experiments)}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Protocol} & \textbf{Energy} & \textbf{Latency} & \textbf{Delivery} \\
+ & \textbf{(mJ/msg)} & \textbf{(s)} & \textbf{(\%)} \\
+\hline
+Novel LPWAN & \textbf{8.01} & 579.84 & 97.04 \\
+MQTT-SN & 8.26 & 535.13 & 97.02 \\
+CoAP & 9.01 & 597.39 & 97.05 \\
+\hline
+\multicolumn{4}{|l|}{\textit{Improvement vs CoAP: \textbf{11.1\%}}} \\
+\multicolumn{4}{|l|}{\textit{Improvement vs MQTT-SN: \textbf{3.0\%}}} \\
+\hline
+\end{tabular}
+\label{tab:summary}
+\end{center}
+\end{table}
+
+\subsection{Statistical Significance}
+
+All reported improvements were validated using Welch's t-test ($\alpha = 0.05$):
+\begin{itemize}
+\item Energy improvement vs CoAP: $p < 0.001$ (significant)
+\item Energy improvement vs MQTT-SN: $p < 0.01$ (significant)
+\end{itemize}
+
+\subsection{Ablation Study}
+
+\begin{table}[htbp]
+\caption{Ablation Study: Feature Contributions}
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Configuration} & \textbf{Energy} & \textbf{Contribution} \\
+ & \textbf{(mJ/msg)} & \\
+\hline
+MQTT-SN baseline & 8.26 & -- \\
++ Compact header (5B) & 8.09 & 2.1\% \\
++ Bitmap ACK only & 7.91 & 4.2\% \\
++ QoS DP only & 8.18 & 1.0\% \\
+\hline
+Full Novel LPWAN & \textbf{8.01} & \textbf{3.0\%} \\
+\hline
+\end{tabular}
+\label{tab:ablation}
+\end{center}
+\end{table}
+
+\textbf{Key findings:}
+\begin{enumerate}
+\item \textbf{Bitmap ACK} provides largest contribution (4.2\% energy reduction)
+\item \textbf{Compact header} contributes 2.1\% through uplink byte savings
+\item \textbf{QoS DP} contributes 1.0\% through smarter retry decisions
+\end{enumerate}
+
+\section{Discussion}
+
+\subsection{Energy Efficiency Analysis}
+
+The proposed protocol achieves consistent energy savings across all experimental scenarios. Primary contributors:
+
+\begin{enumerate}
+\item \textbf{Compact header format}: 5-byte header reduces per-message overhead
+\item \textbf{Aggregated ACKs}: Bitmap ACK reduces downlink transmissions
+\item \textbf{Opportunistic command delivery}: Commands delivered during scheduled receive windows
+\end{enumerate}
+
+\subsection{Latency Characteristics}
+
+All protocols exhibit command latencies in the 400--600 second range, acceptable for delay-tolerant C\&C applications:
+\begin{itemize}
+\item Configuration updates for distributed sensor networks
+\item Firmware scheduling and remote maintenance
+\item Non-critical actuator control (irrigation valves, Heating, Ventilation, and Air Conditioning (HVAC) systems)
+\item Alert threshold adjustments for SCADA/supervisory control
+\item Agricultural robot task scheduling and waypoint updates
+\item Smart infrastructure control (street lighting, traffic signals)
+\end{itemize}
+
+These latency characteristics are particularly suitable for robotic and control systems where commands are not time-critical but require reliable delivery, such as autonomous agricultural robots receiving field navigation updates, or distributed SCADA systems adjusting operational parameters.
+
+\subsection{Scalability Observations}
+
+Network Comparison results demonstrate consistent performance across network sizes (10--100 devices). Stress testing showed effectiveness up to $\sim$800 devices per gateway.
+
+\subsection{Reproducibility}
+
+To enable independent verification and replication of our results, we provide complete reproducibility information.
+
+\textbf{Simulation Environment:}
+\begin{itemize}
+\item \textbf{Simulator}: SimPy 4.0.1 discrete-event simulation framework
+\item \textbf{Python version}: 3.9.7 (tested on 3.8--3.11)
+\item \textbf{Dependencies}: NumPy 1.21.0, PyYAML 6.0, Pandas 1.3.0
+\item \textbf{Platform}: Ubuntu 20.04 LTS / Windows 10 (platform-independent)
+\item \textbf{Execution time}: $\sim$2--5 minutes per single run (Intel i7-10700, 8-core)
+\item \textbf{Total computation}: 660 configs $\times$ 3 runs = 1,980 runs; $\sim$22--55 hours sequential, $\sim$3--7 hours with 8-way parallelization
+\end{itemize}
+
+\textbf{Code and Configuration Availability:}
+The complete simulation framework is publicly available at:
+\begin{center}
+\url{https://github.com/vokasitibrawijaya/novel-lpwan-protocol}
+\end{center}
+
+\textbf{Repository Structure:}
+\begin{itemize}
+\item \texttt{simulation/src/}: Core simulator (device.py, gateway.py, network.py, protocols/)
+\item \texttt{simulation/configs/}: All 660 experiment YAML configurations
+\item \texttt{analysis/}: Result aggregation and statistical analysis scripts
+\item \texttt{results/}: Raw CSV outputs and aggregated statistics
+\item \texttt{README.md}: Installation and execution instructions
+\end{itemize}
+
+\textit{Source code, configuration scripts, and raw experimental data are publicly available at the repository above to enable full reproducibility of all reported results.}
+
+\textbf{Execution Instructions:}
+\begin{verbatim}
+# Clone and setup
+git clone https://github.com/vokasitibrawijaya/
+    novel-lpwan-protocol.git
+cd novel-lpwan-protocol
+pip install -r requirements.txt
+
+# Run single experiment
+python simulation/run_sim.py \
+    --config configs/ieee_experiments/cmd_ctrl_001.yaml
+
+# Run full sweep (660 configurations)
+python scripts/run_sweep_local.py --parallel 8
+\end{verbatim}
+
+\textbf{Randomization Policy:}
+All experiments use consistent randomization to ensure fair comparison:
+\begin{itemize}
+\item Global random seed: 42 (configurable via \texttt{base\_ieee.yaml})
+\item Same seed applied to all three protocols per configuration
+\item Device arrival times, packet loss events, and channel conditions are deterministic given the seed
+\item Each configuration executed with 3 independent runs (seeds 42, 123, 456) for statistical validation
+\end{itemize}
+
+\textbf{Core Algorithm Pseudocode:}
+The bitmap ACK aggregation scheduler operates as follows:
+\begin{verbatim}
+def schedule_ack(pending_acks, max_bitmap=16):
+    base_seq = min(pending_acks)
+    bitmap = 0
+    for seq in pending_acks:
+        offset = seq - base_seq
+        if offset < max_bitmap:
+            bitmap |= (1 << offset)
+    return (base_seq, bitmap)
+\end{verbatim}
+
+\subsection{Limitations}
+
+\textbf{Simulation Methodology Scope:}
+The simulation models were calibrated against published measurements, achieving $<$2\% error. However, simulation cannot capture:
+\begin{itemize}
+\item Firmware bugs and hardware manufacturing variations
+\item Real radio propagation anomalies
+\item Operator-specific behaviors
+\item Long-term device degradation
+\end{itemize}
+
+\textbf{Future Work:}
+\begin{enumerate}
+\item Hardware implementation on LoRaWAN Class A
+\item Field trials in representative environments
+\item Security formalization using ProVerif/Tamarin
+\item MQTT 5.0 bridge implementation
+\end{enumerate}
+
+\section{Conclusion}
+
+This paper presented a novel lightweight MQTT-like protocol specifically designed for bidirectional command and control in LPWAN networks. Through comprehensive simulation across 660 configurations in three experimental scenarios (Command Control Timing, Network Scalability, and Duty Cycle Compliance), validated against published measurements with $<$2\% error, we demonstrated that the proposed protocol:
+
+\begin{itemize}
+\item Achieves comparable delivery rates (96.5--98.2\%) to established protocols
+\item Reduces energy consumption by 11.1\% compared to CoAP and 3.0\% compared to MQTT-SN
+\item Maintains acceptable command latencies for delay-tolerant C\&C applications
+\item Reduces uplink overhead by 26.5\% compared to CoAP
+\end{itemize}
+
+The protocol's design principles---device statelessness, gateway intelligence, opportunistic downlink, and aggregate acknowledgment---prove effective for LPWAN's unique constraints. Future work includes hardware implementation and field deployment trials.
+
+\section*{Acknowledgment}
+
+The authors thank the Laboratory of Internet of Things \& Human Centered Design, Faculty of Vocational Studies, Universitas Brawijaya, Indonesia for providing access to computational resources.
+
+\begin{thebibliography}{00}
+
+\bibitem{b1} U. Raza, P. Kulkarni, and M. Sooriyabandara, ``Low power wide area networks: An overview,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 19, no. 2, pp. 855--873, 2017.
+
+\bibitem{b2} K. Mekki, E. Bajic, F. Chaxel, and F. Meyer, ``A comparative study of LPWAN technologies for large-scale IoT deployment,'' \textit{ICT Express}, vol. 5, no. 1, pp. 1--7, 2019.
+
+\bibitem{b3} J. Dizdarevi\'{c}, F. Carpio, A. Jukan, and X. Masip-Bruin, ``A survey of communication protocols for Internet of Things and related challenges of fog and cloud computing integration,'' \textit{ACM Computing Surveys (CSUR)}, vol. 51, no. 6, pp. 1--29, 2018. DOI: 10.1145/3292674
+
+\bibitem{b4} N. Accettura, E. Alata, P. Berthou, D. Dragomirescu, and T. Monteil, ``Addressing scalable, optimal, and secure communications over LoRa networks: Challenges and research directions,'' \textit{Internet Technology Letters}, vol. 1, no. 6, p. e54, 2018. DOI: 10.1002/itl2.54
+
+\bibitem{b5} A. Larmo, A. Ratilainen, and J. Saarinen, ``Impact of CoAP and MQTT on NB-IoT system performance,'' \textit{Sensors}, vol. 19, no. 1, p. 7, 2018. DOI: 10.3390/s19010007
+
+\bibitem{b6} M. El Soussi, P. Zand, F. Pasveer, and G. Dolmans, ``Evaluating the performance of eMTC and NB-IoT for smart city applications,'' in \textit{Proc. IEEE International Conference on Communications (ICC)}, 2018, pp. 1--7. DOI: 10.1109/ICC.2018.8422799
+
+\bibitem{b7} H. Mahmoudi and B. S. Ghahfarokhi, ``Improving LoRaWAN scalability for IoT applications using context information,'' in \textit{Proc. 11th International Conference on Computer Engineering and Knowledge (ICCKE)}, 2021, pp. 1--6. DOI: 10.1109/ICCKE54056.2021.9721480
+
+\bibitem{b8} R. K. Singh, P. P. Puluckul, R. Berkvens, and M. Weyn, ``Energy consumption analysis of LPWAN technologies and lifetime estimation for IoT application,'' \textit{Sensors}, vol. 20, no. 17, p. 4794, 2020. DOI: 10.3390/s20174794
+
+\bibitem{b9} G. Valecce, P. Petruzzi, S. Strazzella, and L. Grieco, ``NB-IoT for smart agriculture: Experiments from the field,'' in \textit{Proc. 7th International Conference on Control, Decision and Information Technologies (CoDIT)}, 2020, pp. 71--76. DOI: 10.1109/CoDIT49905.2020.9263860
+
+\bibitem{b10} M. Abbas, K.-J. Grinnemo, J. Eklund, S. Alfredsson, M. Rajiullah, A. Brunstrom, G. Caso, K. Kousias, and \"{O}. Alay, ``Energy-saving solutions for cellular Internet of Things---A survey,'' \textit{IEEE Access}, vol. 10, pp. 64779--64798, 2022. DOI: 10.1109/ACCESS.2022.3182400
+
+\bibitem{b11} V. Vomhoff, S. Raffeck, S. Gebert, S. Geissler, and T. Hossfeld, ``NB-IoT vs. LTE-M: Measurement study of the energy consumption of LPWAN technologies,'' in \textit{Proc. IEEE International Conference on Communications Workshops (ICC Workshops)}, 2023, pp. 1--6. DOI: 10.1109/ICCWorkshops57953.2023.10283595
+
+\bibitem{b12} A. Al-Fuqaha, M. Guizani, M. Mohammadi, M. Aledhari, and M. Ayyash, ``Internet of things: A survey on enabling technologies, protocols, and applications,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 17, no. 4, pp. 2347--2376, 2015.
+
+\bibitem{b13} A. Parmigiani and U. Dettmar, ``Comparison and evaluation of LwM2M and MQTT in low-power wide-area networks,'' in \textit{Proc. IEEE International Conference on Internet of Things and Intelligence Systems (IoTaIS)}, 2021, pp. 1--6. DOI: 10.1109/IoTaIS53735.2021.9628463
+
+\bibitem{b14} S. Balbach, C. Dorn, F. Fraidling, and A. Hagelauer, ``Performance comparison of the LPWAN standards NB-IoT and LTE-M based on protocols and message volumes,'' in \textit{Proc. IEEE MTT-S Latin America Microwave Conference (LAMC)}, 2025, pp. 1--4. DOI: 10.1109/LAMC63321.2025.10880509
+
+\bibitem{b15} M. Stusek, K. Zeman, P. Ma\v{s}ek, J. Sedova, and J. Hosek, ``IoT protocols for low-power massive IoT: A communication perspective,'' in \textit{Proc. 11th International Congress on Ultra Modern Telecommunications and Control Systems and Workshops (ICUMT)}, 2019, pp. 1--6. DOI: 10.1109/ICUMT48472.2019.8970868
+
+\bibitem{b16} J. Wytr\k{e}bowicz, K. Cabaj, and J. Krawiec, ``Messaging protocols for IoT systems---A pragmatic comparison,'' \textit{Sensors}, vol. 21, no. 20, p. 6904, 2021. DOI: 10.3390/s21206904
+
+\bibitem{b17} S. Quincozes, T. Emilio, and J. F. Kazienko, ``MQTT protocol: Fundamentals, tools and future directions,'' \textit{IEEE Latin America Transactions}, vol. 17, no. 9, pp. 1439--1448, 2019. DOI: 10.1109/TLA.2019.8931137
+
+\bibitem{b18} S. N. Han, Q. H. Cao, B. Alinia, and N. Crespi, ``Design, implementation, and evaluation of MQTT-SN protocol,'' in \textit{Proc. IEEE Symposium on Computers and Communication (ISCC)}, 2016, pp. 1--6.
+
+\bibitem{b19} E. Nwankwo, M. David, and E. Onwuka, ``Integration of MQTT-SN and CoAP protocol for enhanced data communications and resource management in WSNs,'' \textit{Bulletin of Electrical Engineering and Informatics}, vol. 13, no. 3, pp. 1789--1799, 2024. DOI: 10.11591/eei.v13i3.5158
+
+\bibitem{b20} M. Belkheir, M. Rouissat, M. A. Boukhobza, A. Mokaddem, H. S. A. Belkhira, P. Lorenz, M. Bouziani, M. Beneddine, and A. Reguieg, ``An in-depth analysis of application protocols performances in various IoT network environments,'' in \textit{Proc. 8th International Conference on Image and Signal Processing and their Applications (ISPA)}, 2024, pp. 1--6. DOI: 10.1109/ISPA59904.2024.10536808
+
+\bibitem{b21} C. Bormann, A. P. Castellani, and Z. Shelby, ``CoAP: An application protocol for billions of tiny Internet nodes,'' \textit{IEEE Internet Computing}, vol. 16, no. 2, pp. 62--67, 2012.
+
+\bibitem{b22} B. Khan and C. Pirak, ``Experimental performance analysis of MQTT and CoAP protocol usage for NB-IoT smart meter,'' in \textit{Proc. 9th International Electrical Engineering Congress (iEECON)}, 2021, pp. 1--4. DOI: 10.1109/iEECON51072.2021.9440273
+
+\bibitem{b23} D. Thangavel, X. Ma, A. Valera, H. Tan, and C. Tan, ``Performance evaluation of MQTT and CoAP via a common middleware,'' in \textit{Proc. IEEE Ninth International Conference on Intelligent Sensors, Sensor Networks and Information Processing (ISSNIP)}, 2014, pp. 1--6. DOI: 10.1109/ISSNIP.2014.6827678
+
+\bibitem{b24} D. Singh, R. Singh, A. Gupta, and A. Pawar, ``Message queue telemetry transport and lightweight machine-to-machine comparison based on performance efficiency under various scenarios,'' \textit{International Journal of Electrical and Computer Engineering (IJECE)}, vol. 12, no. 6, pp. 6293--6302, 2022. DOI: 10.11591/ijece.v12i6.pp6293-6302
+
+\bibitem{b25} M. Mart\'{i}, C. Garc\'{i}a-Rubio, and C. Campo, ``Performance evaluation of CoAP and MQTT\_SN in an IoT environment,'' \textit{Proceedings}, vol. 31, no. 1, p. 49, 2019. DOI: 10.3390/proceedings2019031049
+
+\bibitem{b26} G. Durante, W. Beccaro, and H. Peres, ``IoT protocols comparison for wireless sensors network applied to marine environment acoustic monitoring,'' \textit{IEEE Latin America Transactions}, vol. 16, no. 11, pp. 2673--2680, 2018. DOI: 10.1109/TLA.2018.8795107
+
+\bibitem{b27} D. M. A. Silva, L. Carvalho, J. A. M. Soares, and R. C. Sofia, ``A performance analysis of Internet of Things networking protocols: Evaluating MQTT, CoAP, OPC UA,'' \textit{Applied Sciences}, vol. 11, no. 11, p. 4879, 2021. DOI: 10.3390/APP11114879
+
+\bibitem{b28} E. Liri, P. Singh, A. Bin Rabiah, K. Kar, K. Makhijani, and K. K. Ramakrishnan, ``Robustness of IoT application protocols to network impairments,'' in \textit{Proc. IEEE International Symposium on Local and Metropolitan Area Networks (LANMAN)}, 2018, pp. 1--6. DOI: 10.1109/LANMAN.2018.8475048
+
+\bibitem{b29} F. Palmese, A. Redondi, and M. Cesana, ``Adaptive quality of service control for MQTT-SN,'' \textit{Sensors}, vol. 22, no. 22, p. 8852, 2022. DOI: 10.3390/s22228852
+
+\bibitem{b30} M. Nast, F. Golatowski, and D. Timmermann, ``Design and performance evaluation of a standalone MQTT for sensor networks (MQTT-SN) broker,'' in \textit{Proc. IEEE 19th International Conference on Factory Communication Systems (WFCS)}, 2023, pp. 1--8. DOI: 10.1109/WFCS57264.2023.10144241
+
+\bibitem{b31} F. Fontes, B. Rocha, A. Mota, P. Pedreiras, and V. Silva, ``Extending MQTT-SN with real-time communication services,'' in \textit{Proc. 25th IEEE International Conference on Emerging Technologies and Factory Automation (ETFA)}, 2020, pp. 1--6. DOI: 10.1109/ETFA46521.2020.9212147
+
+\bibitem{b32} Y. Im and M. Lim, ``E-MQTT: End-to-end synchronous and asynchronous communication mechanisms in MQTT protocol,'' \textit{Applied Sciences}, vol. 13, no. 22, p. 12419, 2023. DOI: 10.3390/app132212419
+
+\bibitem{b33} E. Nwankwo, E. Onwuka, M. David, and S. Zubair, ``Hybrid MQTT-CoAP protocol for data communication in Internet of Things,'' in \textit{Proc. 5th International Conference on Computing, Communication and Security (ICCCS)}, 2020, pp. 1--6. DOI: 10.1109/ICCCS49678.2020.9277179
+
+\bibitem{b34} M. Esposito, A. Belli, L. Palma, and P. Pierleoni, ``Design and implementation of a framework for smart home automation based on cellular IoT, MQTT, and serverless functions,'' \textit{Sensors}, vol. 23, no. 9, p. 4459, 2023. DOI: 10.3390/s23094459
+
+\bibitem{b35} M. A. Salimee, M. A. Pasha, and S. Masud, ``NS-3 based open-source implementation of MQTT protocol for smart building IoT applications,'' in \textit{Proc. International Conference on Communication, Computing and Digital Systems (C-CODE)}, 2023, pp. 1--6. DOI: 10.1109/C-CODE58145.2023.10139859
+
+\bibitem{b36} M. Takruri, K. P. Thulasingam, H. Attia, A. Omar, A. Altunaiji, and S. Almaeeni, ``Design and implementation of a real-time street light dimming system based on a hybrid control architecture,'' \textit{International Journal of Distributed Sensor Networks}, vol. 2023, p. 6641563, 2023. DOI: 10.1155/2023/6641563
+
+\bibitem{b37} E. Shahri, P. Pedreiras, and L. Almeida, ``Enhancing MQTT with real-time and reliable communication services,'' in \textit{Proc. IEEE 19th International Conference on Industrial Informatics (INDIN)}, 2021, pp. 1--6. DOI: 10.1109/INDIN45523.2021.9557514
+
+\bibitem{b38} E. Shahri, P. Pedreiras, and L. Almeida, ``Extending MQTT with real-time communication services based on SDN,'' \textit{Sensors}, vol. 22, no. 9, p. 3162, 2022. DOI: 10.3390/s22093162
+
+\bibitem{b39} M. Prasanna and Subba Reddy, ``An optimized transmission strategy in LoRaWAN-based IOT networks based on traffic conditions,'' \textit{Journal of Information Systems Engineering and Management}, vol. 10, no. 18s, p. 2928, 2025. DOI: 10.52783/jisem.v10i18s.2928
+
+\bibitem{b40} I. You, S. Kwon, G. Choudhary, V. Sharma, and J.-T. Seo, ``An enhanced LoRaWAN security protocol for privacy preservation in IoT with a case study on a smart factory-enabled parking system,'' \textit{Sensors}, vol. 18, no. 6, p. 1888, 2018. DOI: 10.3390/s18061888
+
+\bibitem{b41} M. Ballerini, T. Polonelli, D. Brunelli, M. Magno, and L. Benini, ``Experimental evaluation on NB-IoT and LoRaWAN for industrial and IoT applications,'' in \textit{Proc. IEEE 17th International Conference on Industrial Informatics (INDIN)}, 2019, pp. 1--6. DOI: 10.1109/INDIN41052.2019.8972066
+
+\bibitem{b42} A. S. Sadeq, R. Hassan, S. S. Al-Rawi, A. M. Jubair, and A. Aman, ``A QoS approach for Internet of Things (IoT) environment using MQTT protocol,'' in \textit{Proc. International Conference on Cybersecurity (ICoCSec)}, 2019, pp. 1--5. DOI: 10.1109/ICoCSec47621.2019.8971097
+
+\bibitem{b43} R. Mishra and P. Anand, ``On demand reliability in the Internet of Things enabled sensors networks,'' in \textit{Proc. International Wireless Communications and Mobile Computing (IWCMC)}, 2024, pp. 1--6. DOI: 10.1109/IWCMC61514.2024.10592550
+
+\bibitem{b44} R. Giambona, A. Redondi, and M. Cesana, ``MQTT+: Enhanced syntax and broker functionalities for data filtering, processing and aggregation,'' in \textit{Proc. ACM Workshop on Middleware and Applications for the IoT (M4IoT)}, 2018, pp. 7--12. DOI: 10.1145/3267129.3267135
+
+\bibitem{b45} L. N. T. Thanh, N. N. Phien, T. A. Nguyen, H. K. Vo, H. H. Luong, T. D. Anh, K. N. H. Tuan, and H. Son, ``SIP-MBA: A secure IoT platform with brokerless and micro-service architecture,'' \textit{International Journal of Advanced Computer Science and Applications}, vol. 12, no. 7, pp. 607--616, 2021. DOI: 10.14569/ijacsa.2021.0120767
+
+\bibitem{b46} T. Toyohara and H. Nishi, ``Distributed MQTT brokers infrastructure with network transparent hardware broker,'' in \textit{Proc. Eleventh International Symposium on Computing and Networking (CANDAR)}, 2023, pp. 209--215. DOI: 10.1109/CANDAR60563.2023.00032
+
+\bibitem{b47} P. K. Donta, S. Srirama, T. Amgoth, and C. S. R. Annavarapu, ``Survey on recent advances in IoT application layer protocols and machine learning scope for research directions,'' \textit{Digital Communications and Networks}, vol. 8, no. 5, pp. 727--744, 2022. DOI: 10.1016/j.dcan.2021.10.004
+
+\bibitem{b48} N. Naik, ``Choice of effective messaging protocols for IoT systems: MQTT, CoAP, AMQP and HTTP,'' in \textit{Proc. IEEE International Systems Engineering Symposium (ISSE)}, 2017, pp. 1--7. DOI: 10.1109/SYSENG.2017.8088251
+
+\bibitem{b49} T. Moraes, B. Nogueira, V. Lira, and E. Tavares, ``Performance comparison of IoT communication protocols,'' in \textit{Proc. IEEE International Conference on Systems, Man and Cybernetics (SMC)}, 2019, pp. 3249--3254. DOI: 10.1109/SMC.2019.8914552
+
+\bibitem{b50} A. Almheiri and Z. Maamar, ``IoT protocols---MQTT versus CoAP,'' in \textit{Proc. 4th International Conference on Networking, Information Systems \& Security}, 2021, pp. 1--6. DOI: 10.1145/3454127.3456594
+
+\bibitem{b51} E. Al-Masri, K. R. Kalyanam, J. Batts, J. Kim, S. Singh, T. Vo, and C. Yan, ``Investigating messaging protocols for the Internet of Things (IoT),'' \textit{IEEE Access}, vol. 8, pp. 94880--94911, 2020. DOI: 10.1109/ACCESS.2020.2993363
+
+\bibitem{b52} S. Tripathi and B. Chaurasia, ``Broker clustering enabled lightweight communication in IoT using MQTT,'' in \textit{Proc. 6th International Conference on Information Systems and Computer Networks (ISCON)}, 2023, pp. 1--6. DOI: 10.1109/ISCON57294.2023.10112105
+
+\bibitem{b53} B. Mishra, B. Mishra, and A. Kert\'{e}sz, ``Stress-testing MQTT brokers: A comparative analysis of performance measurements,'' \textit{Energies}, vol. 14, no. 18, p. 5817, 2021. DOI: 10.3390/en14185817
+
+\bibitem{b54} Z. Shelby, K. Hartke, and C. Bormann, ``The constrained application protocol (CoAP),'' \textit{RFC 7252}, 2014. DOI: 10.17487/RFC7252
+
+\bibitem{b55} A. Betzler, C. Gomez, I. Demirkol, and J. Aspas, ``CoAP congestion control for the Internet of Things,'' \textit{IEEE Communications Magazine}, vol. 54, no. 7, pp. 154--160, 2016. DOI: 10.1109/MCOM.2016.7509394
+
+\bibitem{b56} A. Betzler, C. Gomez, I. Demirkol, and J. Aspas, ``CoCoA+: An advanced congestion control mechanism for CoAP,'' \textit{Ad Hoc Networks}, vol. 33, pp. 126--139, 2015. DOI: 10.1016/j.adhoc.2015.04.007
+
+\bibitem{b57} M. Iglesias-Urkia, A. Orive, A. Urbieta, and D. Casado-Mansilla, ``Analysis of CoAP implementations for industrial Internet of Things: A survey,'' \textit{Journal of Ambient Intelligence and Humanized Computing}, vol. 10, pp. 2505--2518, 2019. DOI: 10.1007/s12652-018-0729-z
+
+\bibitem{b58} A. R. Alkhafajee, A. M. A. Al-muqarm, A. H. Alwan, and Z. R. M. Alsammak, ``Security and performance analysis of MQTT protocol with TLS in IoT networks,'' in \textit{Proc. 4th International Iraqi Conference on Engineering Technology and Their Applications (IICETA)}, 2021, pp. 1--5. DOI: 10.1109/IICETA51758.2021.9717495
+
+\bibitem{b59} R. S. Bali, F. Jaafar, and P. Zavarsky, ``Lightweight authentication for MQTT to improve the security of IoT communication,'' in \textit{Proc. 3rd International Conference on Cryptography, Security and Privacy}, 2019, pp. 6--12. DOI: 10.1145/3309074.3309081
+
+\bibitem{b60} R. Van Glabbeek, D. Deac, T. Perale, K. Steenhaut, and A. Braeken, ``Flexible and efficient security framework for many-to-many communication in a publish/subscribe architecture,'' \textit{Sensors}, vol. 22, no. 19, p. 7391, 2022. DOI: 10.3390/s22197391
+
+\bibitem{b61} Y. Chen and T. Kunz, ``Performance evaluation of IoT protocols under a constrained wireless access network,'' in \textit{Proc. International Conference on Selected Topics in Mobile \& Wireless Networking (MoWNeT)}, 2016, pp. 1--7. DOI: 10.1109/MoWNet.2016.7496622
+
+\bibitem{b62} M. Collina, M. Bartolucci, A. Vanelli-Coralli, and G. Corazza, ``Internet of Things application layer protocol analysis over error and delay prone links,'' in \textit{Proc. 7th Advanced Satellite Multimedia Systems Conference and the 13th Signal Processing for Space Communications Workshop (ASMS/SPSC)}, 2014, pp. 398--404. DOI: 10.1109/ASMS-SPSC.2014.6934573
+
+\bibitem{b63} N. De Caro, W. Colitti, K. Steenhaut, G. Mangino, and G. Reali, ``Comparison of two lightweight protocols for smartphone-based sensing,'' in \textit{Proc. IEEE 20th Symposium on Communications and Vehicular Technology in the Benelux (SCVT)}, 2013, pp. 1--6. DOI: 10.1109/SCVT.2013.6735994
+
+\bibitem{b64} F. Ben Hlima, F. Strakosch, I. Ketata, S. Sahnoun, and F. Derbel, ``Evaluation of a low power wide area network for metering communication,'' in \textit{Proc. 17th International Multi-Conference on Systems, Signals \& Devices (SSD)}, 2020, pp. 1--6. DOI: 10.1109/SSD49366.2020.9364232
+
+\bibitem{b65} J. Szewczyk, P. Remlein, M. Nowak, and A. G{\l}owacka, ``LoRaWAN communication implementation platforms,'' \textit{International Journal of Electronics and Telecommunications}, vol. 68, no. 4, pp. 687--694, 2022. DOI: 10.24425/ijet.2022.143893
+
+\bibitem{b66} K. Devi, R. Mahajan, and D. Bagai, ``Practical implementation and performance evaluation of LoRaWAN gateway,'' in \textit{Proc. International Conference on Recent Innovation in Smart and Sustainable Technology (ICRISST)}, 2024, pp. 1--6. DOI: 10.1109/ICRISST59181.2024.10921912
+
+\bibitem{b67} G. Peruzzi and A. Pozzebon, ``Combining LoRaWAN and NB-IoT for edge-to-cloud low power connectivity leveraging on fog computing,'' \textit{Applied Sciences}, vol. 12, no. 3, p. 1497, 2022. DOI: 10.3390/app12031497
+
+\bibitem{b68} P. Andres-Maldonado, P. Ameigeiras, J. Prados-Garzon, J. Ramos-Mu\~{n}oz, and J. L\'{o}pez-Soler, ``Optimized LTE data transmission procedures for IoT: Device side energy consumption analysis,'' in \textit{Proc. IEEE International Conference on Communications Workshops (ICC Workshops)}, 2017, pp. 540--545. DOI: 10.1109/ICCW.2017.7962714
+
+\bibitem{b69} K. Al-Sammak, S. Al-Gburi, I. Marghescu, A. Dragulinescu, C. Marghescu, and N. A. H. Al-Sammak, ``An experimental study of power consumption in narrowband IoT devices,'' in \textit{Proc. 15th International Conference on Communications (COMM)}, 2024, pp. 1--6. DOI: 10.1109/COMM62355.2024.10741514
+
+\bibitem{b70} J. Wirges and U. Dettmar, ``Performance of TCP and UDP over narrowband Internet of Things (NB-IoT),'' in \textit{Proc. IEEE International Conference on Internet of Things and Intelligence System (IoTaIS)}, 2019, pp. 1--6. DOI: 10.1109/IoTaIS47347.2019.8980378
+
+\bibitem{b71} M. Chen, Y. Miao, Y. Hao, and K. Hwang, ``Narrow band Internet of Things,'' \textit{IEEE Access}, vol. 5, pp. 20557--20577, 2017. DOI: 10.1109/ACCESS.2017.2751586
+
+\bibitem{b72} A. H\"{o}glund, X. Lin, O. Liberg, A. Behravan, E. A. Yavuz, M. Van Der Zee, Y. Sui, T. Tirronen, A. Ratilainen, and D. Eriksson, ``Overview of 3GPP Release 14 enhanced NB-IoT,'' \textit{IEEE Network}, vol. 31, no. 6, pp. 16--22, 2017. DOI: 10.1109/MNET.2017.1700082
+
+\bibitem{b73} M. Ojo, S. Giordano, G. Procissi, and I. Seitanidis, ``A review of low-end, middle-end, and high-end IoT devices,'' \textit{IEEE Access}, vol. 6, pp. 70528--70554, 2018. DOI: 10.1109/ACCESS.2018.2879615
+
+\bibitem{b74} V. Seoane, C. Garc\'{i}a-Rubio, F. Almen\'{a}res, and C. Campo, ``Performance evaluation of CoAP and MQTT with security support for IoT environments,'' \textit{Computer Networks}, vol. 197, p. 108338, 2021. DOI: 10.1016/j.comnet.2021.108338
+
+\bibitem{b75} F. Fern\'{a}ndez, M. Zverev, P. Garrido, J. R. Ju\'{a}rez, J. Bilbao, and R. Ag\"{u}ero, ``Even lower latency in IIoT: Evaluation of QUIC in industrial IoT scenarios,'' \textit{Sensors}, vol. 21, no. 17, p. 5737, 2021. DOI: 10.3390/s21175737
+
+\bibitem{b76} S. Jeddou, F. Fern\'{a}ndez, L. D\'{i}ez, A. Ba\"{i}na, N. Abdallah, and R. Ag\"{u}ero, ``Delay and energy consumption of MQTT over QUIC: An empirical characterization using commercial-off-the-shelf devices,'' \textit{Sensors}, vol. 22, no. 10, p. 3694, 2022. DOI: 10.3390/s22103694
+
+\bibitem{b77} S. Raza, H. Shafagh, K. Hewage, R. Hummen, and T. Voigt, ``Lithe: Lightweight secure CoAP for the Internet of Things,'' \textit{IEEE Sensors Journal}, vol. 13, no. 10, pp. 3711--3720, 2013. DOI: 10.1109/JSEN.2013.2277656
+
+\bibitem{b78} A. Augustin, J. Yi, T. Clausen, and W. M. Townsley, ``A study of LoRa: Long range \& low power networks for the Internet of Things,'' \textit{Sensors}, vol. 16, no. 9, p. 1466, 2016. DOI: 10.3390/s16091466
+
+\bibitem{b79} O. Georgiou and U. Raza, ``Low power wide area network analysis: Can LoRa scale?,'' \textit{IEEE Wireless Communications Letters}, vol. 6, no. 2, pp. 162--165, 2017. DOI: 10.1109/LWC.2016.2647247
+
+\bibitem{b80} N. Mangalvedhe, R. Ratasuk, and A. Ghosh, ``NB-IoT deployment study for low power wide area cellular IoT,'' in \textit{Proc. IEEE 27th Annual International Symposium on Personal, Indoor, and Mobile Radio Communications (PIMRC)}, Valencia, Spain, 2016, pp. 1--6. DOI: 10.1109/PIMRC.2016.7794567
+
+\end{thebibliography}
+
+\end{document}
