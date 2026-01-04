@@ -773,20 +773,22 @@ The complete simulation framework is publicly available at:
 \textit{Source code, configuration scripts, and raw experimental data are publicly available at the repository above to enable full reproducibility of all reported results.}
 
 \textbf{Execution Instructions:}
+\begin{small}
 \begin{verbatim}
-# Clone and setup
-git clone https://github.com/vokasitibrawijaya/
-    novel-lpwan-protocol.git
+# Clone
+git clone https://github.com/
+  vokasitibrawijaya/novel-lpwan-protocol.git
 cd novel-lpwan-protocol
 pip install -r requirements.txt
 
-# Run single experiment
-python simulation/run_sim.py \
-    --config configs/ieee_experiments/cmd_ctrl_001.yaml
+# Single run
+python simulation/run_sim.py --config \
+  configs/ieee_experiments/cmd_ctrl_001.yaml
 
-# Run full sweep (660 configurations)
+# Full sweep (660 configs, 8-way parallel)
 python scripts/run_sweep_local.py --parallel 8
 \end{verbatim}
+\end{small}
 
 \textbf{Randomization Policy:}
 All experiments use consistent randomization to ensure fair comparison:
