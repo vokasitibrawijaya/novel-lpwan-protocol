@@ -1,0 +1,67 @@
+coap:
+  ack_efficiency: 1.0
+  avg_cmd_latency_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    WnBW6VA8IkE=
+  commands_applied: 233.0
+  delivery_rate: 0.9632158283405322
+  downlink_bytes: 6263.0
+  energy_per_msg_mj: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    NJRlq1umJUA=
+  total_airtime_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    Prfz/WoUPkE=
+  uplink_bytes: 488036.0
+mqtt_sn:
+  ack_efficiency: 1.0
+  avg_cmd_latency_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    jDIwBqJBIkE=
+  commands_applied: 230.0
+  delivery_rate: 0.9654451720774697
+  downlink_bytes: 5869.0
+  energy_per_msg_mj: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    Bop3j7+SI0A=
+  total_airtime_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    HQOBlVE6O0E=
+  uplink_bytes: 387558.0
+novel_lpwan:
+  ack_efficiency: 14.87295081967213
+  avg_cmd_latency_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    2m+URHZSIkE=
+  commands_applied: 80.0
+  delivery_rate: 0.9644001672007803
+  downlink_bytes: 6091.0
+  energy_per_msg_mj: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    pAIwQIEdI0A=
+  total_airtime_ms: !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    7QkCq+qfOkE=
+  uplink_bytes: 358850.0

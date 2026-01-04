@@ -1,0 +1,4 @@
+protocol,delivery_rate_mean,delivery_rate_std,avg_cmd_latency_ms_mean,avg_cmd_latency_ms_std,energy_per_msg_mj_mean,energy_per_msg_mj_std,uplink_bytes_sum,downlink_bytes_sum
+coap,0.9647,0.0015,599816.091,1336.3172,10.7403,0.1372,102454036.0,37925861.0
+mqtt_sn,0.9646,0.0016,599122.3423,1321.7165,9.864,0.1016,81360666.0,34944861.0
+novel_lpwan,0.9648,0.0015,595803.0034,3995.6829,9.5876,0.0886,75334000.0,50831515.0

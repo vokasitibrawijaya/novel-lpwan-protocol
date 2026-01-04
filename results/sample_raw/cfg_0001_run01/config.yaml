@@ -1,0 +1,199 @@
+device:
+  battery:
+    capacity_mah: 2400
+    voltage_v: 3.0
+  memory:
+    flash_bytes: 192000
+    ram_bytes: 20480
+  power:
+    idle: 1.0
+    rx: 12.0
+    sleep: 0.001
+    tx_dbm_to_mw:
+      2: 25
+      5: 32
+      8: 40
+      11: 55
+      14: 80
+      17: 100
+      20: 120
+  stack_overhead:
+    coap_flash: 6144
+    coap_ram: 256
+    mqtt_sn_flash: 8192
+    mqtt_sn_ram: 512
+    novel_lpwan_flash: 2048
+    novel_lpwan_ram: 32
+gateway:
+  mqtt_bridge:
+    broker_host: localhost
+    broker_port: 1883
+    enabled: true
+    qos_mapping:
+      best_effort: 0
+      critical: 1
+      normal: 1
+  queue_size: 1000
+  scheduler: priority_deadline
+metrics:
+  collect_interval_s: 60
+  enabled:
+  - packet_delivery_ratio
+  - end_to_end_latency
+  - energy_per_bit
+  - energy_per_delivered_message
+  - throughput
+  - protocol_overhead
+  - retransmission_rate
+  - ack_efficiency
+  - state_memory_usage
+  - deadline_compliance_rate
+  - qos_class_delivery_rate
+  - airtime_utilization
+  - collision_rate
+  - channel_utilization
+  - command_delivery_latency
+  - command_success_rate
+  - downlink_efficiency
+  output_format: csv
+  statistics:
+    calculate_ci: true
+    calculate_percentiles:
+    - 50
+    - 90
+    - 95
+    - 99
+    confidence_level: 0.95
+network:
+  lorawan:
+    bandwidth_khz: 125
+    channel_model:
+      noise_figure_db: 6
+      path_loss_exp: 2.75
+      shadow_std_db: 7.8
+    coding_rate: 4/5
+    duty_cycle: 0.01
+    per_model:
+      snr_threshold_db:
+        7: -7.5
+        8: -10.0
+        9: -12.5
+        10: -15.0
+        11: -17.5
+        12: -20.0
+      type: snr_based
+    region: EU868
+    rx1_delay_ms: 1000
+    rx2_delay_ms: 2000
+    rx2_freq_mhz: 869.525
+    rx2_sf: 12
+    spreading_factors:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  nbiot:
+    carrier_freq_mhz: 900
+    channel_model:
+      indoor_penetration_db: 20
+      mcl_db: 164
+    data_rates:
+      downlink_peak_kbps: 27.2
+      downlink_typical_kbps: 15
+      uplink_peak_kbps: 62.5
+      uplink_typical_kbps: 20
+    edrx_cycle_s: 20.48
+    psm_enabled: true
+    ue_category: cat-nb1
+  num_devices: 100
+  num_gateways: 1
+  type: lorawan
+protocols:
+  coap:
+    ack_random_factor: 1.5
+    ack_timeout_s: 2
+    confirmable_ratio: 0.5
+    enabled: true
+    header_sizes:
+      base: 4
+      option_avg: 5
+      token: 4
+    max_latency_s: 100
+    max_retransmit: 4
+    version: RFC7252
+  mqtt_sn:
+    clean_session: true
+    enabled: true
+    header_sizes:
+      connack: 3
+      connect: 10
+      disconnect: 2
+      pingreq: 2
+      pingresp: 2
+      puback: 7
+      publish_qos0: 7
+      publish_qos1: 9
+      suback: 8
+      subscribe: 7
+    keep_alive_s: 60
+    max_inflight: 1
+    qos_levels:
+    - 0
+    - 1
+    - 2
+    - -1
+    topic_id_type: predefined
+    version: '1.2'
+  novel_lpwan:
+    ack_base_bits: 16
+    ack_window_size: 16
+    cmd_types: 8
+    enabled: true
+    epoch_bits: 8
+    header_size_bytes: 5
+    qos_classes:
+    - deadline_s: 600
+      name: critical
+      priority: 0
+      probability: 0.99
+      retries: 3
+    - deadline_s: 3600
+      name: normal
+      priority: 1
+      probability: 0.9
+      retries: 2
+    - deadline_s: 86400
+      name: best_effort
+      priority: 2
+      probability: 0.5
+      retries: 0
+    token_size_bytes: 12
+simulation:
+  confidence_level: 0.95
+  duration_hours: 24
+  num_runs: 30
+  run_id: 1
+  seed: 12345
+  time_step_ms: 100
+  warmup_hours: 2
+traffic:
+  command_pull:
+    budget_default: 3
+    enabled: true
+  downlink:
+    mean_rate_per_hour: 0.1
+    pattern: bursty
+    payload_bytes: 10
+    payload_std: 3
+    priority_distribution:
+      best_effort: 0.7
+      critical: 0.05
+      normal: 0.25
+  uplink:
+    interval_s: 600
+    jitter_ratio: 0.1
+    pattern: periodic
+    payload_bytes: 20
+    payload_std: 5
