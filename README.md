@@ -10,11 +10,11 @@ This repository contains the simulation code, analysis scripts, and experimental
 
 **"Novel Lightweight MQTT-like Protocol for Bidirectional Command and Control in LPWAN Networks"**
 
-Submitted to IEEE Access Journal, 2026.
+Published in Journal of Robotics and Control (JRC), 2026.
 
 ## Abstract
 
-Low Power Wide Area Networks (LPWAN) have emerged as a fundamental technology for IoT applications requiring long-range communication with minimal energy consumption. This work presents a novel lightweight MQTT-like protocol specifically designed for bidirectional command and control in LPWAN networks.
+Low Power Wide Area Networks (LPWAN) have emerged as a fundamental technology for IoT applications requiring long-range communication with minimal energy consumption. This work presents a novel lightweight MQTT-like protocol specifically designed for bidirectional command and control in LPWAN networks, with applications in robotics and industrial control systems.
 
 ### Key Innovations
 
@@ -30,13 +30,10 @@ Low Power Wide Area Networks (LPWAN) have emerged as a fundamental technology fo
 ```
 novel-lpwan-protocol/
 ├── README.md                    # This file
-├── IEEE_COMPLIANCE_AUDIT.md     # IEEE publication compliance checklist
-├── IEEE_COMPLIANCE_STATUS.md    # Detailed compliance status
 ├── paper/
-│   ├── Novel_LPWAN_Protocol_Paper.tex   # LaTeX source
-│   ├── Novel_LPWAN_Protocol_Paper.bbl   # Bibliography
-│   ├── Novel_LPWAN_Protocol_Paper.pdf   # Compiled paper
-│   └── IEEEtran.cls                     # IEEE template
+│   ├── Novel_LPWAN_Protocol_JRC.tex     # LaTeX source (JRC format)
+│   ├── Novel_LPWAN_Protocol_JRC.pdf     # Published paper
+│   └── IEEEtran.cls                     # Document class
 ├── simulation/
 │   ├── run_sim.py               # Main simulation entry point
 │   ├── README.md                # Simulation documentation
@@ -54,14 +51,14 @@ novel-lpwan-protocol/
 │   │       └── coap.py          # CoAP baseline
 │   ├── configs/
 │   │   ├── base.yaml            # Base configuration
-│   │   └── base_ieee.yaml       # IEEE-compliant base config
+│   │   └── base_ieee.yaml       # Standard base config
 │   └── scripts/
 │       ├── gen_configs.py       # Configuration generator
-│       ├── gen_ieee_configs.py  # IEEE experiment configs
+│       ├── gen_ieee_configs.py  # Experiment configs
 │       └── run_sweep_local.py   # Local sweep runner
 ├── analysis/
 │   ├── analyze_results.py       # Results analysis
-│   └── ieee_analysis.py         # IEEE-compliant analysis
+│   └── ieee_analysis.py         # Statistical analysis
 ├── results/
 │   ├── sample_raw/              # Sample raw results (3 runs)
 │   │   ├── cfg_0001_run01/
@@ -105,7 +102,7 @@ cd simulation
 python run_sim.py --config configs/base_ieee.yaml --output ../results/test_run
 ```
 
-### Running IEEE-Compliant Experiments
+### Running Experiments
 
 ```bash
 # Generate experiment configurations
@@ -124,12 +121,12 @@ python ieee_analysis.py --input ../results/raw --output ../results/analysis
 
 ## Experimental Configuration
 
-### IEEE Compliance
+### Reproducibility Standards
 
-All experiments follow IEEE publication standards:
-- **Minimum 30 independent runs** per configuration
-- **Documented random seeds** for reproducibility
-- **Statistical significance** with 95% confidence intervals
+All experiments follow rigorous reproducibility standards:
+- **3 independent runs** per configuration (seeds: 42, 123, 456)
+- **Documented random seeds** for full reproducibility
+- **Statistical analysis** with variance reporting
 
 ### Experiments
 
@@ -200,9 +197,10 @@ If you use this code or data in your research, please cite:
 @article{novel_lpwan_2026,
   title={Novel Lightweight MQTT-like Protocol for Bidirectional Command and Control in LPWAN Networks},
   author={[Authors]},
-  journal={IEEE Access},
+  journal={Journal of Robotics and Control (JRC)},
   year={2026},
   volume={},
+  number={},
   pages={},
   doi={}
 }
