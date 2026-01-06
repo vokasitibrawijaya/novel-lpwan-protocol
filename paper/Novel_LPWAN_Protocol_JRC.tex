@@ -55,12 +55,14 @@ ISSN: 2715-5072, DOI: 10.18196/jrc.vxix.xxxxx}
 \title{A Novel Lightweight MQTT-Like Protocol for Bidirectional Command and Control in LPWAN Networks: Design, Implementation, and Performance Evaluation}
 
 \author{
-Rachmad Andri Atmoko\textsuperscript{1}, Bayu Sutawijaya\textsuperscript{1*}, Akas Bagus Setiawan\textsuperscript{2}, Devasis Pradhan\textsuperscript{3}, Ismail Rakip Karas\textsuperscript{4}\\
+Rachmad Andri Atmoko\textsuperscript{1}, Bayu Sutawijaya\textsuperscript{1*}, Akas Bagus Setiawan\textsuperscript{2},\\
+Devasis Pradhan\textsuperscript{3}, Ismail Rakip Karas\textsuperscript{4}\\
 \textsuperscript{1}Faculty of Vocational Studies, Universitas Brawijaya, Malang, Indonesia \\
 \textsuperscript{2}Department of Information Technology, Jember State Polytechnic, Jember, Indonesia \\
 \textsuperscript{3}ECE Department, Acharya Institute of Technology, India \\
 \textsuperscript{4}Computer Engineering Department, Karabük University, Demir Celik Campus, Karabük, Turkey \\
-Email: \textsuperscript{1}ra.atmoko@ub.ac.id, bayu\_sutawijaya@ub.ac.id, \textsuperscript{2}akasbagus\_s@polije.ac.id, \textsuperscript{3}devasispradhan@acharya.ac.in, \textsuperscript{4}ismail.karas@karabuk.edu.tr\\
+Email: \textsuperscript{1}ra.atmoko@ub.ac.id, bayu\_sutawijaya@ub.ac.id, \textsuperscript{2}akasbagus\_s@polije.ac.id,\\
+\textsuperscript{3}devasispradhan@acharya.ac.in, \textsuperscript{4}ismail.karas@karabuk.edu.tr\\
 *Corresponding Author
 }
 
@@ -566,17 +568,17 @@ Fig.~\ref{fig:topology} shows the simulated network topologies. We evaluate both
     gateway/.style={rectangle, draw, fill=green!40, minimum size=0.6cm, font=\tiny}
 ]
 % Single Gateway (left)
-\node[font=\footnotesize, align=center] at (1.5,3) {(a) Single Gateway};
+\node[font=\footnotesize, align=center] at (1.5,3.5) {(a) Single Gateway};
 \node[gateway] (gw1) at (1.5,1.5) {GW};
 \foreach \i in {1,...,8} {
     \pgfmathsetmacro{\angle}{360/8*\i}
     \node[device] (d\i) at ({1.5+1.5*cos(\angle)},{1.5+1.5*sin(\angle)}) {};
     \draw[gray, thin] (gw1) -- (d\i);
 }
-\node[font=\tiny] at (1.5,0) {N=10,50,100};
+\node[font=\tiny] at (1.5,-0.3) {N=10,50,100};
 
 % Dual Gateway (right)
-\node[font=\footnotesize, align=center] at (5.5,3) {(b) Dual Gateway};
+\node[font=\footnotesize, align=center] at (5.5,3.5) {(b) Dual Gateway};
 \node[gateway] (gw2a) at (4.5,1.5) {GW1};
 \node[gateway] (gw2b) at (6.5,1.5) {GW2};
 \foreach \i in {1,...,5} {
@@ -594,7 +596,7 @@ Fig.~\ref{fig:topology} shows the simulated network topologies. We evaluate both
 \node[device, fill=purple!30] (ov2) at (5.5,0.8) {};
 \draw[gray, thin] (gw2a) -- (ov1); \draw[gray, thin] (gw2b) -- (ov1);
 \draw[gray, thin] (gw2a) -- (ov2); \draw[gray, thin] (gw2b) -- (ov2);
-\node[font=\tiny] at (5.5,0) {Overlap coverage};
+\node[font=\tiny] at (5.5,-0.3) {Overlap coverage};
 
 \end{tikzpicture}
 \caption{Simulated network topologies: (a) single gateway with radial device distribution, (b) dual gateway with overlapping coverage zones.}
