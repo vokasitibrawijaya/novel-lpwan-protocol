@@ -15,6 +15,8 @@
 \usepackage{url}
 \usepackage{fancyhdr}
 \usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,calc,decorations.pathreplacing}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -188,6 +190,49 @@ Our proposed protocol fills this gap by specifically designing for LPWAN bidirec
 
 \section{Protocol Design}
 
+Fig.~\ref{fig:architecture} illustrates the overall system architecture of the proposed Novel LPWAN protocol. The design shifts protocol complexity from resource-constrained end devices to the gateway, enabling efficient bidirectional communication over duty-cycle-limited links.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.85, transform shape,
+    device/.style={rectangle, draw, fill=blue!20, minimum width=1.2cm, minimum height=0.8cm, font=\footnotesize},
+    gateway/.style={rectangle, draw, fill=green!30, minimum width=2cm, minimum height=1.5cm, font=\footnotesize},
+    server/.style={rectangle, draw, fill=orange!30, minimum width=2cm, minimum height=1.2cm, font=\footnotesize},
+    arrow/.style={->, >=stealth, thick}
+]
+% Devices
+\node[device] (d1) at (0,2) {Device 1};
+\node[device] (d2) at (0,1) {Device 2};
+\node[device] (d3) at (0,0) {Device N};
+\node at (0,0.5) {$\vdots$};
+
+% Gateway
+\node[gateway, align=center] (gw) at (3.5,1) {Gateway\\\tiny Token Mgmt\\\tiny ACK Aggregation\\\tiny Cmd Queue};
+
+% Server
+\node[server, align=center] (srv) at (7,1) {Network\\Server/Broker};
+
+% Arrows - Uplink
+\draw[arrow, blue] (d1.east) -- node[above, font=\tiny] {UL} ($(gw.west)+(0,0.4)$);
+\draw[arrow, blue] (d2.east) -- (gw.west);
+\draw[arrow, blue] (d3.east) -- node[below, font=\tiny] {5B hdr} ($(gw.west)+(0,-0.4)$);
+
+% Arrows - Downlink
+\draw[arrow, red, dashed] ($(gw.west)+(0,0.2)$) -- node[above, font=\tiny, pos=0.3] {DL ACK} ($(d1.east)+(0,-0.1)$);
+
+% Gateway to Server
+\draw[arrow, <->] (gw.east) -- node[above, font=\tiny] {MQTT/HTTP} (srv.west);
+
+% Labels
+\node[font=\tiny, align=center] at (0,-0.8) {Stateless\\(Token+Seq only)};
+\node[font=\tiny, align=center] at (3.5,-0.5) {Stateful\\(96-288B/device)};
+\node[font=\tiny, align=center] at (1.8,2.2) {LoRaWAN/NB-IoT};
+
+\end{tikzpicture}
+\caption{System architecture of the Novel LPWAN protocol showing device statelessness and gateway intelligence.}
+\label{fig:architecture}
+\end{figure}
+
 \subsection{Design Principles}
 
 The proposed protocol is built on four core principles:
@@ -225,6 +270,36 @@ Instead of per-message acknowledgments, the protocol uses a bitmap-based aggrega
 \end{itemize}
 
 This reduces downlink ACK traffic by up to 16x compared to per-message acknowledgments.
+
+Fig.~\ref{fig:bitmap_ack} illustrates the bitmap ACK mechanism. Multiple uplinks are acknowledged in a single downlink frame, reducing gateway-to-device traffic and conserving precious downlink capacity under duty cycle constraints.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.8, transform shape]
+% Timeline
+\draw[thick] (0,4) -- (0,0) node[below, font=\footnotesize] {Device};
+\draw[thick] (5,4) -- (5,0) node[below, font=\footnotesize] {Gateway};
+
+% Uplinks
+\draw[->, blue, thick] (0,3.5) -- node[above, font=\tiny] {UL seq=10} (5,3.3);
+\draw[->, blue, thick] (0,3.0) -- node[above, font=\tiny] {UL seq=11} (5,2.8);
+\draw[->, blue, thick] (0,2.5) -- node[above, font=\tiny] {UL seq=12} (5,2.3);
+\draw[->, blue, thick] (0,2.0) -- node[above, font=\tiny] {UL seq=13} (5,1.8);
+
+% Aggregated ACK
+\draw[->, red, thick, dashed] (5,1.3) -- node[above, font=\tiny, align=center] {ACK base=10\\bitmap=0b1111} (0,1.1);
+
+% Annotations
+\node[font=\tiny, align=left] at (6.5,2.5) {Gateway\\buffers\\4 uplinks};
+\draw[decorate, decoration={brace, amplitude=5pt}] (5.2,3.5) -- (5.2,1.8) node[midway, right, xshift=3pt, font=\tiny] {};
+
+% RX Window
+\draw[<->, gray] (0.1,1.5) -- (0.1,1.1) node[midway, left, font=\tiny] {RX1};
+
+\end{tikzpicture}
+\caption{Bitmap ACK sequence: four uplinks (seq 10--13) acknowledged in a single 7-byte downlink frame with bitmap=0b1111.}
+\label{fig:bitmap_ack}
+\end{figure}
 
 \subsection{Deadline-Probability QoS}
 
@@ -455,6 +530,8 @@ Our simulator achieves $<$2\% error compared to published results.
 
 \subsection{Simulation Parameters}
 
+The simulation environment is configured to model realistic LPWAN deployments in the EU868 frequency band. Table~\ref{tab:params} summarizes the key parameters derived from LoRaWAN regional specifications \cite{b41} and empirical studies \cite{b42}. The spreading factor allocation follows the Adaptive Data Rate (ADR) mechanism, where devices closer to the gateway use lower spreading factors (SF7--SF9) for higher throughput, while distant devices use SF10--SF12 for extended range at reduced data rates. The 1\% duty cycle constraint reflects EU regulatory requirements (ETSI EN 300.220), which fundamentally limits uplink capacity and motivates our aggregate ACK design. Simulation duration varies from 24 hours for steady-state analysis to 72 hours for long-term stability evaluation. All experiments use deterministic random seeds (42, 123, 456) to ensure reproducibility across independent runs.
+
 \begin{table}[htbp]
 \caption{Simulation Parameters Summary}
 \begin{center}
@@ -477,6 +554,50 @@ Random seed & 42 & -- \\
 \end{table}
 
 \subsection{Experimental Scenarios}
+
+Fig.~\ref{fig:topology} shows the simulated network topologies. We evaluate both single-gateway and dual-gateway configurations to assess scalability under varying network densities.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.75, transform shape,
+    device/.style={circle, draw, fill=blue!20, minimum size=0.4cm, font=\tiny},
+    gateway/.style={rectangle, draw, fill=green!40, minimum size=0.6cm, font=\tiny}
+]
+% Single Gateway (left)
+\node[font=\footnotesize, align=center] at (1.5,3) {(a) Single Gateway};
+\node[gateway] (gw1) at (1.5,1.5) {GW};
+\foreach \i in {1,...,8} {
+    \pgfmathsetmacro{\angle}{360/8*\i}
+    \node[device] (d\i) at ({1.5+1.5*cos(\angle)},{1.5+1.5*sin(\angle)}) {};
+    \draw[gray, thin] (gw1) -- (d\i);
+}
+\node[font=\tiny] at (1.5,0) {N=10,50,100};
+
+% Dual Gateway (right)
+\node[font=\footnotesize, align=center] at (5.5,3) {(b) Dual Gateway};
+\node[gateway] (gw2a) at (4.5,1.5) {GW1};
+\node[gateway] (gw2b) at (6.5,1.5) {GW2};
+\foreach \i in {1,...,5} {
+    \pgfmathsetmacro{\angle}{180+180/6*\i}
+    \node[device] (e\i) at ({4.5+1.2*cos(\angle)},{1.5+1.2*sin(\angle)}) {};
+    \draw[gray, thin] (gw2a) -- (e\i);
+}
+\foreach \i in {1,...,5} {
+    \pgfmathsetmacro{\angle}{180/6*\i}
+    \node[device] (f\i) at ({6.5+1.2*cos(\angle)},{1.5+1.2*sin(\angle)}) {};
+    \draw[gray, thin] (gw2b) -- (f\i);
+}
+% Overlap zone
+\node[device, fill=purple!30] (ov1) at (5.5,2.2) {};
+\node[device, fill=purple!30] (ov2) at (5.5,0.8) {};
+\draw[gray, thin] (gw2a) -- (ov1); \draw[gray, thin] (gw2b) -- (ov1);
+\draw[gray, thin] (gw2a) -- (ov2); \draw[gray, thin] (gw2b) -- (ov2);
+\node[font=\tiny] at (5.5,0) {Overlap coverage};
+
+\end{tikzpicture}
+\caption{Simulated network topologies: (a) single gateway with radial device distribution, (b) dual gateway with overlapping coverage zones.}
+\label{fig:topology}
+\end{figure}
 
 Three comprehensive experiments were conducted:
 
